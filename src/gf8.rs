@@ -2,6 +2,7 @@ use crate::field::Field;
 use std::fmt;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
+#[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub(crate) struct Gf8(pub u8);
 

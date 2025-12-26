@@ -5,10 +5,10 @@ use std::ops::{Index, IndexMut, Mul};
 use std::vec::Vec;
 
 #[derive(Clone, PartialEq)]
-struct Matrix<F: Field> {
+pub(crate) struct Matrix<F: Field> {
     pub rows: usize,
     pub columns: usize,
-    elements: Box<[F]>,
+    pub elements: Box<[F]>,
 }
 
 impl<F: Field> Matrix<F> {
@@ -31,6 +31,14 @@ impl<F: Field> Matrix<F> {
             rows: rows,
             columns: rows,
             elements: elements.into_boxed_slice(),
+        }
+    }
+
+    pub fn with_dimensions(rows: usize, columns: usize) -> Self {
+        Matrix {
+            rows,
+            columns,
+            elements: vec![F::zero(); rows * columns].into_boxed_slice(),
         }
     }
 
