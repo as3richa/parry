@@ -5,6 +5,7 @@ mod matrix;
 
 use std::io::{Read, Seek, Write};
 use std::slice;
+use xxhash_rust::xxh3::xxh3_128;
 
 use crate::gf8::Gf8;
 use crate::io::{SeekableShardReader, ShardReadError, ShardReader};
@@ -45,8 +46,8 @@ impl ReedSolomonEncoder {
             encoding_matrix.slice(self.data_shards..self.data_shards + self.parity_shards);
 
         let block_size = self.data_shards * self.chunk_size;
-        let loops = ((length + 8) + block_size - 1) / block_size;
-        let final_loop_block_size = if (length + 8) % block_size == 0 {
+        let loops = (length + 8).div_ceil(block_size);
+        let final_loop_block_size = if (length + 8).is_multiple_of(block_size) {
             block_size
         } else {
             (length + 8) % block_size
@@ -72,9 +73,9 @@ impl ReedSolomonEncoder {
                 }
 
                 for shard in 0..self.data_shards {
-                    output[shard].write_all(
-                        &buffer[shard * self.chunk_size..(shard + 1) * self.chunk_size],
-                    )?;
+                    let data = &buffer[shard * self.chunk_size..(shard + 1) * self.chunk_size];
+                    output[shard].write_all(&xxh3_128(data).to_be_bytes())?;
+                    output[shard].write_all(data)?;
                 }
             }
             // FIXME: ownership?????
@@ -90,10 +91,10 @@ impl ReedSolomonEncoder {
 
                 for parity_shard in 0..self.parity_shards {
                     let shard = self.data_shards + parity_shard;
-                    output[shard].write_all(
-                        &buffer
-                            [parity_shard * self.chunk_size..(parity_shard + 1) * self.chunk_size],
-                    )?;
+                    let data = &buffer
+                        [parity_shard * self.chunk_size..(parity_shard + 1) * self.chunk_size];
+                    output[shard].write_all(&xxh3_128(data).to_be_bytes())?;
+                    output[shard].write_all(data)?;
                 }
             }
         }
