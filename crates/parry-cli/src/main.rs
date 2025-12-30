@@ -78,7 +78,8 @@ fn main() {
                 Vec::with_capacity(args.common.data_shards + args.common.parity_shards);
             for shard in 0..args.common.data_shards + args.common.parity_shards {
                 output_files.push(BufWriter::new(
-                    File::create(args.output_file_pattern.replace("{}", &shard.to_string())).unwrap(),
+                    File::create(args.output_file_pattern.replace("{}", &shard.to_string()))
+                        .unwrap(),
                 ));
             }
 

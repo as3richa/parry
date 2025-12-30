@@ -41,6 +41,8 @@ impl ReedSolomonEncoder {
         assert_eq!(output.len(), self.data_shards + self.parity_shards);
 
         let encoding_matrix = Matrix::<Gf8>::encoding_matrix(self.data_shards, self.parity_shards);
+        let encoding_matrix_excluding_identity =
+            encoding_matrix.slice(self.data_shards..self.data_shards + self.parity_shards);
 
         let block_size = self.data_shards * self.chunk_size;
         let loops = ((length + 8) + block_size - 1) / block_size;
@@ -68,22 +70,29 @@ impl ReedSolomonEncoder {
                 } else {
                     data.read_exact(&mut buffer)?;
                 }
-            }
 
+                for shard in 0..self.data_shards {
+                    output[shard].write_all(
+                        &buffer[shard * self.chunk_size..(shard + 1) * self.chunk_size],
+                    )?;
+                }
+            }
             // FIXME: ownership?????
-            let encoded_data_matrix = encoding_matrix.clone() * data_matrix.clone();
+            let encoded_data_matrix = &encoding_matrix_excluding_identity * &data_matrix;
 
             {
                 let buffer: &[u8] = unsafe {
                     slice::from_raw_parts(
                         encoded_data_matrix.elements.as_ptr() as *mut u8,
-                        (self.data_shards + self.parity_shards) * self.chunk_size,
+                        self.parity_shards * self.chunk_size,
                     )
                 };
 
-                for shard in 0..self.data_shards + self.parity_shards {
+                for parity_shard in 0..self.parity_shards {
+                    let shard = self.data_shards + parity_shard;
                     output[shard].write_all(
-                        &buffer[shard * self.chunk_size..(shard + 1) * self.chunk_size],
+                        &buffer
+                            [parity_shard * self.chunk_size..(parity_shard + 1) * self.chunk_size],
                     )?;
                 }
             }

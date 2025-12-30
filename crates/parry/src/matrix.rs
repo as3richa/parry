@@ -1,7 +1,7 @@
 use crate::field::Field;
 use crate::gf8::Gf8;
 use std::fmt;
-use std::ops::{Index, IndexMut, Mul};
+use std::ops::{Index, IndexMut, Mul, Range};
 use std::vec::Vec;
 
 #[derive(Clone, PartialEq)]
@@ -200,6 +200,19 @@ impl<F: Field> Matrix<F> {
             self[row].swap(i, j);
         }
     }
+
+    pub fn slice(&self, index: Range<usize>) -> Self {
+        let start_row = index.start.clamp(0, self.rows);
+        let end_row = index.end.clamp(start_row, self.rows);
+
+        Matrix {
+            rows: end_row - start_row,
+            columns: self.columns,
+            elements: self.elements[start_row * self.columns..end_row * self.columns]
+                .to_vec()
+                .into_boxed_slice(),
+        }
+    }
 }
 
 impl<F: Field> fmt::Debug for Matrix<F> {
@@ -240,10 +253,10 @@ impl<F: Field> IndexMut<usize> for Matrix<F> {
     }
 }
 
-impl<F: Field> Mul for Matrix<F> {
+impl<F: Field> Mul for &Matrix<F> {
     type Output = Matrix<F>;
 
-    fn mul(self, other: Matrix<F>) -> Matrix<F> {
+    fn mul(self, other: &Matrix<F>) -> Matrix<F> {
         if self.columns != other.rows {
             panic!("Mismatched matrix dimensions in mul")
         }
