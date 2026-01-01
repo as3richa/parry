@@ -8,7 +8,7 @@ use std::slice;
 use xxhash_rust::xxh3::xxh3_128;
 
 use crate::gf8::Gf8;
-use crate::io::{SeekableShardReader, ShardReadError, ShardReader};
+use crate::io::{ChunkReadError, read_chunk, seek_to_chunk, write_chunk};
 use crate::matrix::Matrix;
 
 pub struct ReedSolomonEncoder {
@@ -37,9 +37,9 @@ impl ReedSolomonEncoder {
         &self,
         data: &mut R,
         length: usize,
-        output: &mut [W],
+        shard_writers: &mut [W],
     ) -> std::io::Result<()> {
-        assert_eq!(output.len(), self.data_shards + self.parity_shards);
+        assert_eq!(shard_writers.len(), self.data_shards + self.parity_shards);
 
         let encoding_matrix = Matrix::<Gf8>::encoding_matrix(self.data_shards, self.parity_shards);
         let encoding_matrix_excluding_identity =
@@ -58,7 +58,10 @@ impl ReedSolomonEncoder {
         for i in 0..loops {
             {
                 let mut buffer: &mut [u8] = unsafe {
-                    slice::from_raw_parts_mut(data_matrix.elements.as_ptr() as *mut u8, block_size)
+                    slice::from_raw_parts_mut(
+                        data_matrix.elements.as_mut_ptr() as *mut u8,
+                        block_size,
+                    )
                 };
 
                 if i == 0 {
@@ -73,28 +76,26 @@ impl ReedSolomonEncoder {
                 }
 
                 for shard in 0..self.data_shards {
-                    let data = &buffer[shard * self.chunk_size..(shard + 1) * self.chunk_size];
-                    output[shard].write_all(&xxh3_128(data).to_be_bytes())?;
-                    output[shard].write_all(data)?;
+                    let chunk = &buffer[shard * self.chunk_size..(shard + 1) * self.chunk_size];
+                    write_chunk(&mut shard_writers[shard], chunk)?;
                 }
             }
-            // FIXME: ownership?????
-            let encoded_data_matrix = &encoding_matrix_excluding_identity * &data_matrix;
+
+            let encoded_parity_shard_matrix = &encoding_matrix_excluding_identity * &data_matrix;
 
             {
                 let buffer: &[u8] = unsafe {
                     slice::from_raw_parts(
-                        encoded_data_matrix.elements.as_ptr() as *mut u8,
+                        encoded_parity_shard_matrix.elements.as_ptr() as *mut u8,
                         self.parity_shards * self.chunk_size,
                     )
                 };
 
                 for parity_shard in 0..self.parity_shards {
                     let shard = self.data_shards + parity_shard;
-                    let data = &buffer
+                    let chunk = &buffer
                         [parity_shard * self.chunk_size..(parity_shard + 1) * self.chunk_size];
-                    output[shard].write_all(&xxh3_128(data).to_be_bytes())?;
-                    output[shard].write_all(data)?;
+                    write_chunk(&mut shard_writers[shard], chunk)?;
                 }
             }
         }
@@ -102,19 +103,16 @@ impl ReedSolomonEncoder {
         Result::Ok(())
     }
 
-    pub fn decode<R: ShardReader, W: Write>(
-        data: &[Option<R>],
-        output: W,
-    ) -> Result<(), ShardReadError> {
+    pub fn decode<R: Read, W: Write>(data: &[Option<R>], output: W) -> std::io::Result<()> {
         Result::Ok(())
     }
 
-    pub fn decode_at<R: SeekableShardReader, W: Write>(
+    pub fn decode_at<R: Read + Seek, W: Write>(
         data: &[Option<R>],
         output: W,
         offset: usize,
         length: usize,
-    ) -> Result<(), ShardReadError> {
+    ) -> std::io::Result<()> {
         Result::Ok(())
     }
 }

@@ -1,34 +1,54 @@
 use std::io;
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom, Write};
+use xxhash_rust::xxh3::xxh3_128;
 
-pub enum ShardReadError {
+pub(crate) enum ChunkReadError {
     IoError(io::Error),
-    DataIntegrityError,
+    Truncated,
+    ChecksumValidationFailure,
 }
 
-impl From<io::Error> for ShardReadError {
-    fn from(error: io::Error) -> Self {
-        ShardReadError::IoError(error)
-    }
+pub(crate) fn write_chunk<W: Write>(writer: &mut W, chunk: &[u8]) -> io::Result<()> {
+    writer.write_all(&xxh3_128(chunk).to_be_bytes())?;
+    writer.write_all(chunk)?;
+    Result::Ok(())
 }
 
-pub trait ShardReader {
-    fn read_chunk(&mut self, data: &mut [u8]) -> Result<(), ShardReadError>;
-}
+pub(crate) fn read_chunk<R: Read>(reader: &mut R, chunk: &mut [u8]) -> Result<(), ChunkReadError> {
+    let mut hash_be_bytes = [0u8; 16];
 
-impl<R: Read> ShardReader for R {
-    fn read_chunk(&mut self, data: &mut [u8]) -> Result<(), ShardReadError> {
-        match self.read_exact(data) {
-            Result::Ok(()) => Result::Ok(()),
-            Result::Err(error) => {
-                if error.kind() == io::ErrorKind::UnexpectedEof {
-                    Result::Err(ShardReadError::DataIntegrityError)
-                } else {
-                    Result::Err(ShardReadError::IoError(error))
-                }
-            }
+    reader.read_exact(&mut hash_be_bytes).map_err(|error| {
+        if error.kind() == io::ErrorKind::UnexpectedEof {
+            ChunkReadError::Truncated
+        } else {
+            ChunkReadError::IoError(error)
         }
+    })?;
+
+    let hash = u128::from_be_bytes(hash_be_bytes);
+
+    reader.read_exact(chunk).map_err(|error| {
+        if error.kind() == io::ErrorKind::UnexpectedEof {
+            ChunkReadError::Truncated
+        } else {
+            ChunkReadError::IoError(error)
+        }
+    })?;
+
+    let computed_hash = xxh3_128(chunk);
+
+    if hash == computed_hash {
+        Result::Ok(())
+    } else {
+        Result::Err(ChunkReadError::ChecksumValidationFailure)
     }
 }
 
-pub trait SeekableShardReader: ShardReader + io::Seek {}
+pub(crate) fn seek_to_chunk<R: Seek>(
+    reader: &mut R,
+    chunk_number: usize,
+    chunk_size: usize,
+) -> io::Result<()> {
+    reader.seek(SeekFrom::Start((chunk_size as u64) * (chunk_number as u64)))?;
+    Result::Ok(())
+}

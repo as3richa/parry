@@ -314,9 +314,9 @@ mod tests {
         let inverse_matrix = matrix.clone().invert().expect("Matrix is invertible");
 
         assert!(
-            matrix.clone() * inverse_matrix.clone() == Matrix::<Gf8>::identity_matrix(3),
+            &matrix * &inverse_matrix == Matrix::<Gf8>::identity_matrix(3),
             "{:?}",
-            matrix * inverse_matrix.clone()
+            &matrix * &inverse_matrix
         );
     }
 
