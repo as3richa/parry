@@ -51,8 +51,41 @@ impl Gf8 {
         197u8, 49u8, 254u8, 24u8, 13u8, 99u8, 140u8, 128u8, 192u8, 247u8, 112u8, 7u8,
     ];
 
+    const MULTIPLICATION_TABLE: [[Gf8; 256]; 256] = Self::generate_multiplication_table();
+
+    const fn generate_multiplication_table() -> [[Gf8; 256]; 256] {
+        let mut table = [[Gf8(0); 256]; 256];
+
+        let mut x = 0usize;
+
+        while x < 256 {
+            let mut y = 0usize;
+
+            while y < 256 {
+                table[x][y] = Self::mul_with_log(Gf8(x as u8), Gf8(y as u8));
+
+                y += 1;
+            }
+
+            x += 1;
+        }
+
+        table
+    }
+
+    const fn mul_with_log(x: Gf8, y: Gf8) -> Gf8 {
+        if x.0 == 0 || y.0 == 0 {
+            return Gf8(0);
+        }
+
+        let x_log: u8 = Gf8::LOG[x.0 as usize];
+        let y_log: u8 = Gf8::LOG[y.0 as usize];
+        let z_log: usize = ((x_log as usize) + (y_log as usize)) % 255;
+        Gf8(Gf8::EXP[z_log])
+    }
+
     #[cfg(test)]
-    pub fn elements() -> Box<[Gf8]> {
+    pub(self) fn elements() -> Box<[Gf8]> {
         (0u8..=255u8)
             .map(Gf8)
             .collect::<Vec<Gf8>>()
@@ -109,15 +142,8 @@ impl SubAssign for Gf8 {
 impl Mul for Gf8 {
     type Output = Gf8;
 
-    fn mul(self, y: Gf8) -> Gf8 {
-        if self.0 == 0 || y.0 == 0 {
-            return Gf8(0);
-        }
-
-        let x_log: u8 = Gf8::LOG[self.0 as usize];
-        let y_log: u8 = Gf8::LOG[y.0 as usize];
-        let z_log: usize = ((x_log as usize) + (y_log as usize)) % 255;
-        Gf8(Gf8::EXP[z_log])
+    fn mul(self, y: Self) -> Self::Output {
+        Self::MULTIPLICATION_TABLE[self.0 as usize][y.0 as usize]
     }
 }
 
