@@ -51,7 +51,7 @@ impl Gf8 {
         197u8, 49u8, 254u8, 24u8, 13u8, 99u8, 140u8, 128u8, 192u8, 247u8, 112u8, 7u8,
     ];
 
-    const MULTIPLICATION_TABLE: [[Gf8; 256]; 256] = Self::generate_multiplication_table();
+    pub const MULTIPLICATION_TABLE: [[Gf8; 256]; 256] = Self::generate_multiplication_table();
 
     const fn generate_multiplication_table() -> [[Gf8; 256]; 256] {
         let mut table = [[Gf8(0); 256]; 256];

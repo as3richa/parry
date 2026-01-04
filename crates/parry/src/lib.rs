@@ -147,6 +147,7 @@ impl ReedSolomonEncoder {
         };
 
         let mut data_matrix = Matrix::<Gf8>::with_dimensions(self.data_shards, self.chunk_size);
+        let mut encoded_parity_shard_matrix = Matrix::<Gf8>::with_dimensions(self.parity_shards, self.chunk_size);
 
         for i in 0..blocks {
             {
@@ -174,7 +175,7 @@ impl ReedSolomonEncoder {
                 }
             }
 
-            let encoded_parity_shard_matrix = &encoding_matrix_excluding_identity * &data_matrix;
+            encoded_parity_shard_matrix.multiply_fast_in_place_with_multiplication_table(&encoding_matrix_excluding_identity, &data_matrix);
 
             {
                 let buffer: &[u8] = unsafe {
@@ -316,7 +317,7 @@ impl ReedSolomonEncoder {
                     partial_encoding_matrix.invert().unwrap()
                 });
 
-            data_matrix.multiply_in_place(&*decoding_matrix, &encoded_data_matrix);
+            data_matrix.multiply_fast_in_place_with_multiplication_table(&*decoding_matrix, &encoded_data_matrix);
 
             let block_size = self.data_shards * self.chunk_size;
             let buffer = unsafe {

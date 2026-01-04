@@ -4,7 +4,7 @@ set -euo pipefail
 
 DATA_SHARDS=17
 PARITY_SHARDS=3
-CHUNK_SIZE=4096
+CHUNK_SIZE=200000
 
 ORIGINAL_DATA_FILE="data-file"
 RESTORED_DATA_FILE="restored-data-file"
@@ -20,7 +20,7 @@ CLEANUP_COMMAND="rm $RESTORED_DATA_FILE $SHARD_FILE_PATTERN_PREFIX*"
 
 cargo build --release
 
-dd if=/dev/urandom of=$ORIGINAL_DATA_FILE bs=13377777 count=1
+dd if=/dev/urandom of=$ORIGINAL_DATA_FILE bs=$((100*1024*1024)) count=1
 
 echo "=> With all shards present"
 $ENCODE_COMMAND

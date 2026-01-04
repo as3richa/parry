@@ -233,6 +233,45 @@ impl<F: Field> Matrix<F> {
     }
 }
 
+impl Matrix<Gf8> {
+    pub fn multiply_fast_in_place_with_multiplication_table(&mut self, a: &Self, b: &Self) {
+        assert_eq!(self.rows, a.rows);
+        assert_eq!(self.columns, b.columns);
+        assert_eq!(a.columns, b.rows);
+
+        {
+            let k = 0;
+            let input_row = &b[k];
+
+            for i in 0..self.rows {
+                let columns = self.columns;
+                let output_row = &mut self[i];
+                let a_row = &a[i];
+                let multiplication_table_row = &Gf8::MULTIPLICATION_TABLE[a_row[k].0 as usize];
+
+                for j in 0..columns {
+                    output_row[j] = multiplication_table_row[input_row[j].0 as usize];
+                }
+            }
+        }
+
+        for k in 1..b.rows {
+            let input_row = &b[k];
+
+            for i in 0..self.rows {
+                let columns = self.columns;
+                let output_row = &mut self[i];
+                let a_row = &a[i];
+                let multiplication_table_row = &Gf8::MULTIPLICATION_TABLE[a_row[k].0 as usize];
+
+                for j in 0..columns {
+                    output_row[j] += multiplication_table_row[input_row[j].0 as usize];
+                }
+            }
+        }
+    }
+}
+
 impl<F: Field> fmt::Debug for Matrix<F> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "[")?;
@@ -261,12 +300,14 @@ impl<F: Field> Index<usize> for Matrix<F> {
     type Output = [F];
 
     fn index(&self, row: usize) -> &[F] {
+        assert!((0..self.rows).contains(&row));
         &self.elements[row * self.columns..(row + 1) * self.columns]
     }
 }
 
 impl<F: Field> IndexMut<usize> for Matrix<F> {
     fn index_mut(&mut self, row: usize) -> &mut [F] {
+        assert!((0..self.rows).contains(&row));
         &mut self.elements[row * self.columns..(row + 1) * self.columns]
     }
 }
