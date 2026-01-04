@@ -51,6 +51,7 @@ impl Gf8 {
         197u8, 49u8, 254u8, 24u8, 13u8, 99u8, 140u8, 128u8, 192u8, 247u8, 112u8, 7u8,
     ];
 
+    #[cfg(test)]
     pub fn elements() -> Box<[Gf8]> {
         (0u8..=255u8)
             .map(Gf8)
@@ -75,6 +76,7 @@ impl Field for Gf8 {
     }
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
 impl Add for Gf8 {
     type Output = Gf8;
 
@@ -89,6 +91,7 @@ impl AddAssign for Gf8 {
     }
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
 impl Sub for Gf8 {
     type Output = Gf8;
 

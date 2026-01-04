@@ -16,19 +16,19 @@ impl<F: Field> Matrix<F> {
         let mut elements = vec![];
 
         for i in 0..rows {
-            for j in 0..i {
+            for _j in 0..i {
                 elements.push(F::zero());
             }
 
             elements.push(F::one());
 
-            for j in i + 1..rows {
+            for _j in i + 1..rows {
                 elements.push(F::zero());
             }
         }
 
         Matrix {
-            rows: rows,
+            rows,
             columns: rows,
             elements: elements.into_boxed_slice(),
         }
@@ -166,7 +166,7 @@ impl<F: Field> Matrix<F> {
             let mut element = Gf8::one();
             let base = Gf8(row as u8);
 
-            for column in 0..columns {
+            for _column in 0..columns {
                 elements.push(element);
                 element *= base;
             }
@@ -213,6 +213,24 @@ impl<F: Field> Matrix<F> {
                 .into_boxed_slice(),
         }
     }
+
+    pub fn multiply_in_place(&mut self, a: &Self, b: &Self) {
+        assert_eq!(self.rows, a.rows);
+        assert_eq!(self.columns, b.columns);
+        assert_eq!(a.columns, b.rows);
+
+        for row in 0..self.rows {
+            for column in 0..self.columns {
+                let mut element = F::zero();
+
+                for i in 0..b.rows {
+                    element += a[row][i] * b[i][column]
+                }
+
+                self.elements[row * self.columns + column] = element;
+            }
+        }
+    }
 }
 
 impl<F: Field> fmt::Debug for Matrix<F> {
@@ -257,9 +275,10 @@ impl<F: Field> Mul for &Matrix<F> {
     type Output = Matrix<F>;
 
     fn mul(self, other: &Matrix<F>) -> Matrix<F> {
-        if self.columns != other.rows {
-            panic!("Mismatched matrix dimensions in mul")
-        }
+        assert_eq!(
+            self.columns, other.rows,
+            "Mismatched matrix dimensions in mul"
+        );
 
         let mut elements: Vec<F> = Vec::with_capacity(self.rows * other.columns);
 
