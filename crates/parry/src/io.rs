@@ -44,6 +44,7 @@ pub(crate) fn read_chunk<R: Read>(reader: &mut R, chunk: &mut [u8]) -> Result<()
     }
 }
 
+#[allow(unused)]
 pub(crate) fn seek_to_chunk<R: Seek>(
     reader: &mut R,
     chunk_number: usize,

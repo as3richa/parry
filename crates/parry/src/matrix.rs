@@ -214,6 +214,7 @@ impl<F: Field> Matrix<F> {
         }
     }
 
+    #[allow(unused)]
     pub fn multiply_in_place(&mut self, a: &Self, b: &Self) {
         assert_eq!(self.rows, a.rows);
         assert_eq!(self.columns, b.columns);
@@ -239,8 +240,7 @@ impl Matrix<Gf8> {
         assert_eq!(self.columns, b.columns);
         assert_eq!(a.columns, b.rows);
 
-        {
-            let k = 0;
+        for k in 0..b.rows {
             let input_row = &b[k];
 
             for i in 0..self.rows {
@@ -249,23 +249,64 @@ impl Matrix<Gf8> {
                 let a_row = &a[i];
                 let multiplication_table_row = &Gf8::MULTIPLICATION_TABLE[a_row[k].0 as usize];
 
-                for j in 0..columns {
-                    output_row[j] = multiplication_table_row[input_row[j].0 as usize];
+                if k == 0 {
+                    for element in output_row.iter_mut() {
+                        *element = Gf8::zero();
+                    }
                 }
-            }
-        }
 
-        for k in 1..b.rows {
-            let input_row = &b[k];
+                let mut j = 0;
 
-            for i in 0..self.rows {
-                let columns = self.columns;
-                let output_row = &mut self[i];
-                let a_row = &a[i];
-                let multiplication_table_row = &Gf8::MULTIPLICATION_TABLE[a_row[k].0 as usize];
+                // SIMD implementation on ARM is actually not any faster -- but it's interesting!
+                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+                unsafe {
+                    use core::arch::aarch64::{
+                        uint8x16x4_t, vdupq_n_u8, veorq_u8, vld1q_u8, vorrq_u8, vqtbl4q_u8,
+                        vst1q_u8,
+                    };
 
-                for j in 0..columns {
+                    unsafe fn load_u8x16x4(data: *const u8) -> uint8x16x4_t {
+                        unsafe {
+                            uint8x16x4_t(
+                                vld1q_u8(data.add(0)),
+                                vld1q_u8(data.add(16)),
+                                vld1q_u8(data.add(32)),
+                                vld1q_u8(data.add(48)),
+                            )
+                        }
+                    }
+
+                    let table0 = load_u8x16x4(multiplication_table_row.as_ptr() as *const u8);
+                    let table1 =
+                        load_u8x16x4((multiplication_table_row.as_ptr() as *const u8).add(0x40));
+                    let table2 =
+                        load_u8x16x4((multiplication_table_row.as_ptr() as *const u8).add(0x80));
+                    let table3 =
+                        load_u8x16x4((multiplication_table_row.as_ptr() as *const u8).add(0xc0));
+
+                    while j + 16 <= columns {
+                        let input = vld1q_u8((input_row.as_ptr() as *const u8).add(j));
+                        let output = vorrq_u8(
+                            vorrq_u8(
+                                vqtbl4q_u8(table0, input),
+                                vqtbl4q_u8(table1, veorq_u8(input, vdupq_n_u8(0x40))),
+                            ),
+                            vorrq_u8(
+                                vqtbl4q_u8(table2, veorq_u8(input, vdupq_n_u8(0x80))),
+                                vqtbl4q_u8(table3, veorq_u8(input, vdupq_n_u8(0xc0))),
+                            ),
+                        );
+                        let accumulated =
+                            veorq_u8(output, vld1q_u8((output_row.as_ptr() as *const u8).add(j)));
+                        vst1q_u8((output_row.as_mut_ptr() as *mut u8).add(j), accumulated);
+
+                        j += 16;
+                    }
+                }
+
+                while j < columns {
                     output_row[j] += multiplication_table_row[input_row[j].0 as usize];
+                    j += 1;
                 }
             }
         }

@@ -18,7 +18,7 @@ DECODE_COMMAND="$BINARY decode $COMMON_FLAGS --data-file $RESTORED_DATA_FILE"
 CHECKSUM_COMMAND="shasum $ORIGINAL_DATA_FILE $RESTORED_DATA_FILE"
 CLEANUP_COMMAND="rm $RESTORED_DATA_FILE $SHARD_FILE_PATTERN_PREFIX*"
 
-cargo build --release
+RUSTFLAGS="-C target-cpu=native" cargo build --release
 
 dd if=/dev/urandom of=$ORIGINAL_DATA_FILE bs=$((100*1024*1024)) count=1
 
